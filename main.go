@@ -27,12 +27,8 @@ import (
 	"strings"
 )
 
-const usageMessage = "" + `new usage: funccover [instrumentation flags] [arguments...]:
+const usageMessage = "" + `usage: go build -a -toolexec 'binary [instrumentation flags]' [arguments...]:
 funccover generates an instrumented source code for function coverage
-Generated source code can be built or ran normally to get the coverage data
-Coverage data will be written to a file periodically while binary is running also when main ends
-
-Currently funccover only works for single source file, source file path shall be given as an argument
 `
 
 func usage() {
