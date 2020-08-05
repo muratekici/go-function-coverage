@@ -263,7 +263,7 @@ func link(args []string) ([]string, error) {
 	defer file.Close()
 
 	b, err := ioutil.ReadAll(file)
-	fmt.Println("yeni importcfg forl link -----> " + string(b))
+	fmt.Println("importcfg file for link -----> " + string(b))
 
 	return args, nil
 }
