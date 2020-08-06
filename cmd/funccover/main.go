@@ -19,8 +19,8 @@ import (
 	"crypto/sha256"
 	"flag"
 	"fmt"
-	"io/ioutil"
-	"log"
+	_ "io/ioutil"
+	_ "log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -85,14 +85,17 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
+		executeCommand(args)
 	} else if isLink(args[0]) {
 		args, err = link(args)
-		if err != nil {
-			panic(err)
+		if args[1] != "-V=full" {
+			executeCommand(args)
+		} else {
+			executeCommand(args)
 		}
+	} else {
+		executeCommand(args)
 	}
-
-	executeCommand(args)
 
 }
 
@@ -178,22 +181,34 @@ func instrumentPackage(args []string) ([]string, error) {
 		return args, nil
 	}
 
+	///usr/local/go/pkg/tool/darwin_amd64/link
+	pkgPath := filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(args[0]))), filepath.Base(filepath.Dir(args[0])))
+	fmt.Println(pkgPath)
+	/// create importcfg for compiling covcollect
+	covImports := "cov_importcfg"
+	pathToCovCollect := os.Getenv("GOPATH") + "/src/github.com/muratekici/go-function-coverage/pkg/covcollect/covcollect.go "
+
+	catArgs := []string{"bash", "-c", "cat >" + filepath.Join(buildDir, covImports) + ` << 'EOF'
+packagefile fmt=` + pkgPath + `/fmt.a
+packagefile bufio=` + pkgPath + `/bufio.a
+packagefile os=` + pkgPath + `/os.a
+packagefile time=` + pkgPath + `/time.a
+EOF`}
+
+	fmt.Println(catArgs)
+	executeCommand(catArgs)
+
+	covCollectArgs := []string{args[0], "-o", filepath.Join(buildDir, "cov_pkg.a"), "-p", "covcollect", "-complete", "-std", "-importcfg=" + filepath.Join(buildDir, covImports), "-pack", pathToCovCollect}
+	fmt.Println(covCollectArgs)
+	executeCommand(covCollectArgs)
+	fmt.Println("compile cov bilmemne")
+
 	f, err := os.OpenFile(opt.importCfg, os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
 		panic(err)
 	}
-
-	//
-	if _, err = f.WriteString("packagefile covcollect=/Users/muratekici/Desktop/google/testdata/sample3/pkg.a"); err != nil {
-		panic(err)
-	}
+	f.WriteString("packagefile covcollect=" + filepath.Join(buildDir, "cov_pkg.a") + "\n")
 	f.Close()
-
-	file, err := os.Open(filepath.Join(buildDir, "importcfg"))
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer file.Close()
 
 	files, args = getSources(args)
 
@@ -235,8 +250,6 @@ func instrumentPackage(args []string) ([]string, error) {
 		args = append(args, filePath)
 	}
 
-	fmt.Println("args: ", args)
-
 	return args, nil
 }
 
@@ -255,19 +268,39 @@ func link(args []string) ([]string, error) {
 	if err != nil {
 		panic(err)
 	}
-	if _, err = f.WriteString("packagefile covcollect=/Users/muratekici/Desktop/google/testdata/sample3/pkg.a"); err != nil {
-		panic(err)
-	}
+
+	buildDir := filepath.Dir(opt.importCfg)
+	pkgPath := filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(args[0]))), filepath.Base(filepath.Dir(args[0])))
+
+	f.WriteString("packagefile covcollect=" + filepath.Join(buildDir, "cov_pkg.a") + "\n")
+	f.WriteString("packagefile fmt=" + pkgPath + "/fmt.a\n")
+	f.WriteString("packagefile bufio=" + pkgPath + "/bufio.a\n")
+	f.WriteString("packagefile os=" + pkgPath + "/os.a\n")
+	f.WriteString("packagefile time=" + pkgPath + "/time.a\n")
+	f.WriteString("packagefile bytes=" + pkgPath + "/bytes.a\n")
+	f.WriteString("packagefile errors=" + pkgPath + "/errors.a\n")
+	f.WriteString("packagefile io=" + pkgPath + "/io.a\n")
+	f.WriteString("packagefile unicode/utf8=" + pkgPath + "/unicode/utf8.a\n")
+	f.WriteString("packagefile unicode=" + pkgPath + "/unicode.a\n")
+	f.WriteString("packagefile strconv=" + pkgPath + "/strconv.a\n")
+	f.WriteString("packagefile internal/fmtsort=" + pkgPath + "/internal/fmtsort.a\n")
+	f.WriteString("packagefile reflect=" + pkgPath + "/reflect.a\n")
+	f.WriteString("packagefile sync=" + pkgPath + "/sync.a\n")
+	f.WriteString("packagefile math=" + pkgPath + "/math.a\n")
+	f.WriteString("packagefile syscall=" + pkgPath + "/syscall.a\n")
+	f.WriteString("packagefile internal/testlog=" + pkgPath + "/internal/testlog.a\n")
+	f.WriteString("packagefile internal/oserror=" + pkgPath + "/internal/oserror.a\n")
+	f.WriteString("packagefile internal/poll=" + pkgPath + "/internal/poll.a\n")
+	f.WriteString("packagefile sync/atomic=" + pkgPath + "/sync/atomic.a\n")
+	f.WriteString("packagefile internal/syscall/execenv=" + pkgPath + "/internal/syscall/execenv.a\n")
+	f.WriteString("packagefile internal/syscall/unix=" + pkgPath + "/internal/syscall/unix.a\n")
+	f.WriteString("packagefile internal/reflectlite=" + pkgPath + "/internal/reflectlite.a\n")
+	f.WriteString("packagefile internal/syscall/unix=" + pkgPath + "/internal/syscall/unix.a\n")
+	f.WriteString("packagefile internal/reflectlite=" + pkgPath + "/internal/reflectlite.a\n")
+	f.WriteString("packagefile math/bits=" + pkgPath + "/math/bits.a\n")
+	f.WriteString("packagefile sort=" + pkgPath + "/sort.a\n")
+	f.WriteString("packagefile internal/race=" + pkgPath + "/internal/race.a\n")
 	f.Close()
-
-	file, err := os.Open(opt.importCfg)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer file.Close()
-
-	b, err := ioutil.ReadAll(file)
-	fmt.Println("yeni importcfg forl link -----> " + string(b))
 
 	return args, nil
 }

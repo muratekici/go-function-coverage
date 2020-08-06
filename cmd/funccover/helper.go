@@ -35,7 +35,8 @@ func astToByte(fset *token.FileSet, f *ast.File) []byte {
 }
 
 // writes necessary counters for instrumentation using w
-// suffix is the suffix string that will be added to the end of variables and functions
+// suffix is the suffix string that will be added to the end of the cover variable
+// filename is the argument that passed into coverage collection functions (can be changed later)
 func addCounters(w io.Writer, content []byte, suffix, fileName string, currentIndex int) (int, error) {
 
 	fset := token.NewFileSet()
@@ -66,13 +67,13 @@ func addCounters(w io.Writer, content []byte, suffix, fileName string, currentIn
 	// Writes the instrumented code using w io.Writer
 	// Insert set instructions to the functions
 	// f() {
-	// 	funcCover_hash.Count[funcNumber] = 1;
+	// 	cover_hash.Counts[funcNumber] = 1;
 	// 	...
 	// }
-	// Also insert defer retrieve_coverage_data_hash() to the main
+	// Also inserts defercover_hash.Collect(args) to the main
 	// func main {
 	// 	...
-	//	defer retrieve_coverage_data_hash()
+	//	defer cover_hash.Collect(args)
 	// }
 
 	eventIndex := 0
@@ -92,8 +93,7 @@ func addCounters(w io.Writer, content []byte, suffix, fileName string, currentIn
 	return currentIndex, nil
 }
 
-// writes the declaration of funcCover variable and necessery functions
-// to the end of the file using go templates
+// writes the declaration of cover variable to the end of the main source file using go templates
 func declCover(w io.Writer, suffix string, fileName string, period time.Duration, funcCover FuncCover) {
 
 	funcTemplate, err := template.New("cover functions and variables").Parse(declTmpl)
