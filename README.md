@@ -35,18 +35,17 @@ limitations under the License.
 
 ## Overview
 
-Go Function Coverage tool 'funccover' support generating instrumented source code files
+Go Function Coverage tool 'funccover' support generating instrumented source code files using go compile
 so that running binary automatically collects the coverage data for functions.
     
-'funccover' inserts a global function coverage variable that will keep the coverage data for functions 
+'funccover' inserts a global function coverage variable using covcollect package that will keep the coverage data for functions 
 to the given source code. Then it inserts necessary instructions to the top of each function 
 (basic assignment instruction to global coverage variable). This way when a function starts executing, 
 global coverage variable will keep the information that this function started execution some time. 
 
-We also have to save that coverage information somewhere. Initially 'funccover' tool writes coverage information
-to a file (RPC will be more useful in the future). Currently 'funccover' tool inserts 2 functions to the given
-source code, one writes coverage data to a file, other calls it periodically. Period must be given as a flag to the tool.
-Tool also inserts a defer call to the main to write coverage data after main function ends. So it is more general. 
+Initially 'funccover' tool writes coverage information to a file (RPC will be more useful in the future) using save function from covcollect package. This function writes the coverage data periodically to a file, RPC calls are easy to add here because we use an external package so that will not change the instrumentation.
+
+-preprocess option is an assumed option in go tool compile that will run given argument with given sources and use the output as new sources. (option can be added to go compile very easily)
 
 ## Quickstart
 
@@ -62,10 +61,8 @@ https://github.com/golang/go/wiki/GOPATH)) you can run 'funccover' directly by w
 ## How To Use It
 
 ```bash
-$ funccover [flags] [arguments...]
+$ go tool compile -preprocess='funccover [flags]' [args]
 ```
-
-Currently 'funccover' only works for single source files, you have to give the name of that file as an argument.  
 
 ### Flags
 
@@ -81,7 +78,7 @@ $ funccover -period=500ms source.go
 
 #### -dst string
 
-This flag sets the destination file name for the instrumented source code (default "instrumented_$source.go").
+This flag sets the destination folder name for the instrumented source codes (default is stdout, stdout must be used with -preprocess).
 
 ```bash
 $ funccover -dst=instrumented_source.go source.go
@@ -89,7 +86,7 @@ $ funccover -dst=instrumented_source.go source.go
 
 #### -o string
 
-This flag sets the coverage output file name (default "cover.out").
+This flag sets the coverage output file name (default "cover.out"), output file for each source will be different, sourcename_givenname.
 
 ```bash
 $ funccover -period=1s -dst=instrumented.go -o=function_coverage.out source.go
@@ -100,12 +97,11 @@ $ funccover -period=1s -dst=instrumented.go -o=function_coverage.out source.go
 You have a source file named src.go that should get 2 arguments to run normally. You want to get the function coverage data for it to a file named cover.txt and since it is a long running code you want to get the coverage data every 1 minutes.
 
 ```bash
-$ funccover -period=1m -o=cover.txt src.go
-$ go build instrumented_src.go
-$ ./instrumented_src argument1 argument2
-```
+$ go tool compile -o p.o -preprocess='funccover -period=1m -o=cover.txt' src1.go src2.go
+$ go tool link -o b p.o
+./b```
 
-After you build the instrumented binary, you can run the binary normally (same way you run the binary for src.go) and coverage data will be written to cover.txt in following format:
+After you compile and link the instrumented binary, you can run the binary normally (same way you run the binary for src.go) and coverage data will be written to src1_cover.txt and src2_cover.tt in following format:
 
 ```
 funccover: src.go
