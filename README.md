@@ -97,7 +97,7 @@ You have 2 source files named src.go and fun.go, both belongs to the same packag
 ```bash
 $ go tool compile cover='period=1m -o=cover.txt' -o=src.o src.go fun.go
 $ go tool link  -o a src.o
-.-o argument1 argument2
+./a argument1 argument2
 ```
 
 After you build the instrumented binary, you can run the binary normally (same way you run the binary for src.go) and coverage data will be written to cover.txt in following format:
