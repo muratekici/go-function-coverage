@@ -26,7 +26,7 @@ import (
 	"time"
 )
 
-//  returns the source code representation of a AST file
+// returns the source code representation of a AST file
 func astToByte(fset *token.FileSet, f *ast.File) []byte {
 	// return the source code as a string
 	var buf bytes.Buffer
@@ -34,19 +34,20 @@ func astToByte(fset *token.FileSet, f *ast.File) []byte {
 	return buf.Bytes()
 }
 
-// writes necessary counters for instrumentation using w
-// suffix is the suffix string that will be added to the end of the cover variable
+// writes necessary set instrucions for instrumentation to cover variable
+// suffix is the string that will be added to the end of the cover variable
 // filename is the argument that passed into coverage collection functions (can be changed later)
-func addCounters(w io.Writer, content []byte, suffix, fileName string) error {
+func addCounters(w io.Writer, content []byte, suffix, fileName string, currentIndex int) (int, error) {
 
 	fset := token.NewFileSet()
 	parsedFile, err := parser.ParseFile(fset, "", content, parser.ParseComments)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	var contentLength = len(content)
 	var events []int
+	var mainRbrace = -1
 
 	// Iterate over the functions to find the positions to insert instructions
 	// Save the positions to insert to the events array
@@ -57,6 +58,9 @@ func addCounters(w io.Writer, content []byte, suffix, fileName string) error {
 		// Function Decleration
 		case *ast.FuncDecl:
 			events = append(events, int(t.Body.Lbrace))
+			if t.Name.Name == "main" {
+				mainRbrace = int(t.Body.Rbrace) - 1
+			}
 		}
 	}
 
@@ -72,17 +76,21 @@ func addCounters(w io.Writer, content []byte, suffix, fileName string) error {
 	//	defer cover_hash.Collect(args)
 	// }
 
-	currentIndex := 0
+	eventIndex := 0
 
 	for i := 0; i < contentLength; i++ {
-		if currentIndex < len(events) && i == events[currentIndex] {
+		if eventIndex < len(events) && i == events[eventIndex] {
 			fmt.Fprintf(w, "\ncover_%s.Counts[%v] = true;", suffix, currentIndex)
 			currentIndex++
+			eventIndex++
+		}
+		if i == mainRbrace {
+			fmt.Fprintf(w, "\n\tdefer cover_%s.Collect(\"%s\")\n", suffix, fileName)
 		}
 		fmt.Fprintf(w, "%s", string(content[i]))
 	}
 
-	return nil
+	return currentIndex, nil
 }
 
 // writes the declaration of cover variable to the end of the main source file using go templates
@@ -118,7 +126,6 @@ func declCover(w io.Writer, suffix string, fileName string, period time.Duration
 
 var declTmpl = `
 var cover_{{.Suffix}} = covcollect.Cover {
-	Len: {{.FuncCount}},
 	Lines: []uint32{ {{range .FuncBlocks}}
 		{{.Line}},{{end}}
 	},

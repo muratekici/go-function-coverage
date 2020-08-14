@@ -16,6 +16,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"flag"
 	"fmt"
 	_ "io/ioutil"
@@ -44,10 +45,6 @@ var (
 	outputFile      = flag.String("o", "cover.out", "file for coverage output")
 )
 
-type Options struct {
-	packageName string
-}
-
 func main() {
 
 	flag.Usage = usage
@@ -67,14 +64,11 @@ func main() {
 
 	args := flag.Args()
 
+	err = instrumentPackage(getGoSources(args))
 	if err != nil {
-		usage()
-		os.Exit(1)
-	}
-
-	err = instrumentPackage(args)
-	if err != nil {
-		panic(err)
+		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, `For ;usage information, run 'funccover' with no arguments and flags`)
+		os.Exit(2)
 	}
 }
 
@@ -102,11 +96,17 @@ func getGoSources(args []string) []string {
 	return sources
 }
 
-func instrumentPackage(args []string) error {
+func instrumentPackage(files []string) error {
 
-	files := getGoSources(args)
+	if len(files) == 0 {
+		return nil
+	}
+
+	sum := sha256.Sum256([]byte(files[0]))
+	uniqueHash := fmt.Sprintf("%x", sum[:6])
 
 	var instrumentation = packageInstrumentation{
+		suffix:   uniqueHash,
 		dir:      *direc,
 		period:   *funcCoverPeriod,
 		fileName: *outputFile,
@@ -116,7 +116,7 @@ func instrumentPackage(args []string) error {
 		res, _ := filepath.Abs(src)
 		err := instrumentation.AddFile(res)
 		if err != nil {
-			panic(err)
+			return err
 		}
 	}
 

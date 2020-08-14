@@ -32,23 +32,27 @@ type FuncCover struct {
 	FuncBlocks []FuncCoverBlock
 }
 
-// SaveFuncs parses given source code and returns a FuncCover instance
-func SaveFuncs(src string, content []byte) ([]FuncCoverBlock, error) {
+// SaveFuncs parses given source code and returns a FuncCover instance, also returns true if main function is given
+func SaveFuncs(src string, content []byte) ([]FuncCoverBlock, bool, error) {
 
 	fset := token.NewFileSet()
 
 	parsedFile, err := parser.ParseFile(fset, "", content, parser.ParseComments)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	var funcBlocks []FuncCoverBlock
+	flag := false
 
 	// Find function declerations to instrument and save them to funcCover
 	for _, decl := range parsedFile.Decls {
 		switch t := decl.(type) {
 		// Function Decleration
 		case *ast.FuncDecl:
+			if t.Name.Name == "main" {
+				flag = true
+			}
 			funcBlocks = append(funcBlocks, FuncCoverBlock{
 				Name: src + ":" + t.Name.Name,
 				Line: uint32(fset.Position(t.Pos()).Line),
@@ -56,5 +60,5 @@ func SaveFuncs(src string, content []byte) ([]FuncCoverBlock, error) {
 		}
 	}
 
-	return funcBlocks, nil
+	return funcBlocks, flag, nil
 }

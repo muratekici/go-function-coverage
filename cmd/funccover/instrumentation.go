@@ -18,7 +18,6 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"crypto/sha256"
 	"fmt"
 	"go/parser"
 	"go/token"
@@ -30,20 +29,24 @@ import (
 	"golang.org/x/tools/go/ast/astutil"
 )
 
+// Instrumenter is the interface for instrumentation
 type Instrumenter interface {
 	AddFile(path string) error
 	Instrument() map[string][]byte
 	WriteInstrumented(dir string, instrumented map[string][]byte)
 }
 
+// Keeps the data necessary for instrumentation
 type packageInstrumentation struct {
 	fileName    string
+	suffix      string
 	period      time.Duration
 	fset        *token.FileSet
 	parsedFiles map[string][]byte
 	dir         string
 }
 
+// Adds a file to instrument to h as source code
 func (h *packageInstrumentation) AddFile(src string) error {
 
 	if h.fset == nil {
@@ -63,28 +66,40 @@ func (h *packageInstrumentation) AddFile(src string) error {
 	return nil
 }
 
+// Instrument instruments all the sources in h and returns a map
 func (h *packageInstrumentation) Instrument() (map[string][]byte, error) {
 
+	var funcCover = FuncCover{}
+	var mainFile = ""
 	var instrumented = make(map[string][]byte)
 
-	var err error
+	for src, content := range h.parsedFiles {
+		temp, flag, err := SaveFuncs(src, content)
+		if err != nil {
+			return nil, err
+		}
+		funcCover.FuncBlocks = append(funcCover.FuncBlocks, temp...)
+		if flag == true {
+			mainFile = src
+		}
+	}
+
+	var currentIndex = 0
 
 	for src, content := range h.parsedFiles {
 
-		var funcCover = FuncCover{}
+		buf := new(bytes.Buffer)
 
-		funcCover.FuncBlocks, err = SaveFuncs(src, content)
+		index, err := addCounters(buf, content, h.suffix, h.fileName, currentIndex)
+		currentIndex = index
+
 		if err != nil {
 			return nil, err
 		}
 
-		sum := sha256.Sum256([]byte(src))
-		uniqueHash := fmt.Sprintf("%x", sum[:6])
-
-		buf := new(bytes.Buffer)
-		err = addCounters(buf, content, uniqueHash, h.fileName+"_"+src)
-		if err != nil {
-			return nil, err
+		if mainFile != src {
+			instrumented[src] = buf.Bytes()
+			continue
 		}
 
 		parsedFile, err := parser.ParseFile(h.fset, "", buf, parser.ParseComments)
@@ -104,7 +119,7 @@ func (h *packageInstrumentation) Instrument() (map[string][]byte, error) {
 		fmt.Fprintf(buf, "%s", importedContent)
 
 		// Write necessary functions variables and an init function that calls periodical_retrieve_$hash() with w
-		declCover(buf, uniqueHash, h.fileName+"_"+src, h.period, funcCover)
+		declCover(buf, h.suffix, h.fileName, h.period, funcCover)
 
 		instrumented[src] = buf.Bytes()
 	}
@@ -112,6 +127,7 @@ func (h *packageInstrumentation) Instrument() (map[string][]byte, error) {
 	return instrumented, nil
 }
 
+// WriteInstrumented writes the instrumented sources to dir with same names
 func (h *packageInstrumentation) WriteInstrumented(instrumented map[string][]byte) error {
 
 	path := h.dir
@@ -125,11 +141,11 @@ func (h *packageInstrumentation) WriteInstrumented(instrumented map[string][]byt
 				return err
 			}
 			w := bufio.NewWriter(fd)
-			fmt.Fprintf(w, "\\%s\n%s", src, content)
+			fmt.Fprintf(w, "// %s\n%s", src, content)
 			w.Flush()
 			fd.Close()
 		} else {
-			fmt.Printf("\\%s\n%s", src, content)
+			fmt.Printf("// %s\n%s", src, content)
 		}
 
 	}
