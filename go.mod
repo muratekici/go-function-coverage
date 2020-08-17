@@ -1,4 +1,5 @@
-module github.com/muratekici/deneme
+module github.com/muratekici/go-function-coverage
+
 go 1.14
 
 require (
