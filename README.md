@@ -50,10 +50,6 @@ Tool also inserts a defer call to the main to write coverage data after main fun
 
 ## Quickstart
 
-First you have to build a custom version of go forked from original source. It implements the -cover flag.
-
-https://github.com/muratekici/go
-
 Get the module from Github and install it into your $GOPATH/bin/
 ```bash
 $ go get github.com/muratekici/go-function-coverage/tree/go-build-integration/...
@@ -95,7 +91,7 @@ o=coverage.out
 You have 2 source files named src.go and fun.go, both belongs to the same package. Normally binary runs with 2 arguments. You want to get the function coverage data for the binary to a file named cover.txt and since it is a long running code you want to get the coverage data every 1 minutes.
 
 ```bash
-$ go build -toolexec=funccover '-period=1m -o=cover.txt' -o=exec src.go fun.go
+$ go build -a -toolexec=funccover '-period=1m -o=cover.txt' -o=exec src.go fun.go
 ./exec argument1 argument2
 ```
 
