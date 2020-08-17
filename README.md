@@ -91,7 +91,7 @@ o=coverage.out
 You have 2 source files named src.go and fun.go, both belongs to the same package. Normally binary runs with 2 arguments. You want to get the function coverage data for the binary to a file named cover.txt and since it is a long running code you want to get the coverage data every 1 minutes.
 
 ```bash
-$ go build -a -toolexec=funccover '-period=1m -o=cover.txt' -o=exec src.go fun.go
+$ go build -a -toolexec='funccover -period=1m -o=cover.txt' -o=exec src.go fun.go
 ./exec argument1 argument2
 ```
 
